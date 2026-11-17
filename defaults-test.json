@@ -1,0 +1,191 @@
+{
+  "dalal-project-board-v1": {
+    "sections": [
+      {
+        "id": "license",
+        "title": "الرخصة",
+        "link": "https://business.sa/",
+        "linkText": "المركز السعودي للأعمال"
+      },
+      {
+        "id": "ip",
+        "title": "الملكية الفكرية",
+        "link": "https://www.saip.gov.sa/ar/services/trademarks/trademark-registration",
+        "linkText": "خدمة تسجيل العلامة التجارية"
+      },
+      {
+        "id": "web",
+        "title": "تعديلات الموقع"
+      },
+      {
+        "id": "data",
+        "title": "بيانات الأماكن ومراجعتها"
+      }
+    ],
+    "titles": {
+      "project": "لوحة مشروع دلال",
+      "next": "الخطوات القادمة"
+    },
+    "steps": [],
+    "tasks": [
+      {
+        "id": "t0",
+        "section": "license",
+        "title": "تحديد النشاط وطريقة التشغيل",
+        "detail": "اكتبي كيف يعمل دلال وكيف يحقق دخلًا إن كان له نموذج ربحي.",
+        "priority": true,
+        "done": false
+      },
+      {
+        "id": "t1",
+        "section": "license",
+        "title": "التحقق من الترخيص المناسب لدلال",
+        "detail": "استفسري عن المتطلبات حسب النشاط وسجّلي المستندات والرسوم في اللوحة.",
+        "priority": false,
+        "done": false
+      },
+      {
+        "id": "t2",
+        "section": "license",
+        "title": "تجهيز المستندات وتقديم الطلب",
+        "detail": "بعد تحديد المتطلبات، سجّلي رقم الطلب وتابعيه.",
+        "priority": false,
+        "done": false
+      },
+      {
+        "id": "t3",
+        "section": "ip",
+        "title": "البحث عن اسم «دلال» والشعار",
+        "detail": "راجعي الأسماء والعلامات المشابهة قبل تقديم الطلب.",
+        "priority": true,
+        "done": false
+      },
+      {
+        "id": "t4",
+        "section": "ip",
+        "title": "تجهيز ملفات العلامة وتحديد فئة التسجيل",
+        "detail": "حددي نطاق الحماية المطلوب وراجعي رسوم التقديم قبل الدفع.",
+        "priority": false,
+        "done": false
+      },
+      {
+        "id": "t5",
+        "section": "ip",
+        "title": "تقديم الطلب ومتابعته",
+        "detail": "سجّلي رقم الطلب وأي مواعيد أو ملاحظات من الجهة.",
+        "priority": false,
+        "done": false
+      },
+      {
+        "id": "t6",
+        "section": "web",
+        "title": "نشر موقع دلال على GitHub Pages",
+        "detail": "",
+        "priority": false,
+        "done": true
+      },
+      {
+        "id": "t7",
+        "section": "web",
+        "title": "اختبار الموقع على الجوال والكمبيوتر",
+        "detail": "افحصي البحث والفئات والخريطة من نسخة الموقع المنشورة.",
+        "priority": true,
+        "done": false
+      },
+      {
+        "id": "t8",
+        "section": "web",
+        "title": "إضافة الفئات الفرعية إلى الموقع",
+        "detail": "ابدئي بالمطاعم والمقاهي، ثم اختبري ظهور الفئات في البحث.",
+        "priority": false,
+        "done": false
+      },
+      {
+        "id": "t9",
+        "section": "web",
+        "title": "تجربة الاستيراد بعينة من الأماكن",
+        "detail": "اختبري إضافة الأماكن ومراجعتها وظهورها في التطبيق.",
+        "priority": false,
+        "done": false
+      },
+      {
+        "id": "t10",
+        "section": "web",
+        "title": "عرض بيانات التواصل والصور",
+        "detail": "راجعي عرض الهاتف والإيميل ورابط الموقع وصورة المكان.",
+        "priority": false,
+        "done": false
+      },
+      {
+        "id": "t11",
+        "section": "data",
+        "title": "تجهيز صفحة مراجعة الأماكن",
+        "detail": "الصفحة تشمل البحث والتعديل وعمودي «تم» و«المراجع».",
+        "priority": false,
+        "done": true
+      },
+      {
+        "id": "t12",
+        "section": "data",
+        "title": "توزيع أول دفعة للمراجعة",
+        "detail": "حددي المراجع لكل مكان واختاري عينة صغيرة من المطاعم والمقاهي.",
+        "priority": false,
+        "done": false
+      },
+      {
+        "id": "t13",
+        "section": "data",
+        "title": "التحقق من بيانات أول دفعة",
+        "detail": "راجعي الاسم والفئة ورابط الخريطة والتواصل عند توفره.",
+        "priority": false,
+        "done": false
+      }
+    ],
+    "cap": null,
+    "costs": [
+      {
+        "id": "c0",
+        "title": "الرخصة والإجراءات",
+        "estimate": null,
+        "paid": null
+      },
+      {
+        "id": "c1",
+        "title": "الملكية الفكرية",
+        "estimate": null,
+        "paid": null
+      },
+      {
+        "id": "c2",
+        "title": "النطاق والاستضافة",
+        "estimate": null,
+        "paid": null
+      },
+      {
+        "id": "c3",
+        "title": "الخريطة والبحث",
+        "estimate": null,
+        "paid": null
+      },
+      {
+        "id": "c4",
+        "title": "تطوير الموقع",
+        "estimate": null,
+        "paid": null
+      },
+      {
+        "id": "c5",
+        "title": "جمع البيانات ومراجعتها",
+        "estimate": null,
+        "paid": null
+      }
+    ],
+    "notes": []
+  },
+  "dalal-hail-review-2026-11-16": {},
+  "dalal-hail-catalog-2026-11-16": {
+    "categories": [],
+    "added": [],
+    "updates": {}
+  }
+}
