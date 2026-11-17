@@ -5,9 +5,9 @@ Supabase publishable key. Anyone with the site link can read and edit the board.
 
 ## One-time setup
 
-Open `setup.html` on the published site, copy `supabase-setup.sql`, and execute it
-in the SQL Editor of project `vxwyzrgvopggoaxggtuy`. No database password or secret
-key belongs in this repository. The site remains on GitHub Pages.
+Execute `supabase-setup.sql` in the SQL Editor of project
+`vxwyzrgvopggoaxggtuy`. No database password or secret key belongs in this
+repository. The site remains on GitHub Pages.
 
 The SQL exposes read access to three specific workspace documents. Writes run
 through a function that checks the expected revision atomically. Every change is
