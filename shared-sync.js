@@ -157,18 +157,7 @@
   if(!localStorage.getItem(backupKey)&&Object.keys(previous).length)local(backupKey,previous);
   importButton.hidden=!localStorage.getItem(backupKey);
   const journal=parse(localStorage.getItem(journalKey),{});
-  for(const key of keys)if(journal[key]?.desired){
-   const entry=journal[key];
-   // lastImport was briefly stored in the shared catalog. It is device-local
-   // UI history, so remove it and unblock conflicts caused only by that field.
-   if(key==='dalal-hail-catalog-2026-11-16'){
-    const hadLastImport=Object.hasOwn(entry.base||{},'lastImport')||Object.hasOwn(entry.desired||{},'lastImport');
-    if(entry.base)delete entry.base.lastImport;
-    if(entry.desired)delete entry.desired.lastImport;
-    if(hadLastImport&&entry.blocked)entry.blocked=false;
-   }
-   pending.set(key,entry);
-  }
+  for(const key of keys)if(journal[key]?.desired)pending.set(key,journal[key]);
   // Before first read, the frame shows the existing per-device data, not an empty board.
   for(const [id,relevant] of [['project',[keys[0]]],['places',keys.slice(1)]]){
    views.set(id,Object.fromEntries(relevant.map(key=>[key,previous[key]??defaults[key]])));

@@ -116,21 +116,17 @@ async function readCsv(event){
    imported++;
   }
   if(!imported)throw new Error('لم يتم العثور على صفوف قابلة للاستيراد.');
-   saveLastImport(importedKeys);
+   catalog.lastImport=importedKeys;
    storeChanges(catalogKey,catalog);storeChanges(storageKey,reviewData);loadCategoryControls();setCategory(selectedCategory);
   byId('change-notice').textContent='تم استيراد '+numbers.format(imported)+' مكان من CSV.';
  }catch(error){byId('change-notice').textContent=error.message||'تعذّر استيراد ملف CSV.';}
  }
-function saveLastImport(keys){
- lastImportKeys=[...keys];
- try{localStorage.setItem(lastImportKey,JSON.stringify(lastImportKeys));}catch{}
-}
 function updateUndoImport(){
  const button=byId('undo-import');
- if(button)button.disabled=lastImportKeys.length===0;
+ if(button)button.disabled=!Array.isArray(catalog.lastImport)||catalog.lastImport.length===0;
 }
 function undoLastImport(){
- const keys=lastImportKeys;
+ const keys=Array.isArray(catalog.lastImport)?catalog.lastImport:[];
  if(!keys.length)return;
  if(!confirm('هل تريدين التراجع عن آخر استيراد وحذف الأماكن التي أضيفت فيه؟'))return;
  const imported=new Set(keys);let removed=0;
@@ -144,7 +140,7 @@ function undoLastImport(){
   if(!imported.has(key))continue;
   records.splice(i,1);delete reviewData[key];
  }
- saveLastImport([]);
+ catalog.lastImport=[];
  storeChanges(catalogKey,catalog);storeChanges(storageKey,reviewData);
  loadCategoryControls();setCategory(category);
  byId('change-notice').textContent='تم التراجع عن آخر استيراد وحذف '+numbers.format(removed)+' مكان.';
@@ -171,7 +167,7 @@ function deleteSelectedPlaces(){
   delete catalog.updates[key];delete reviewData[key];searchIndex.delete(record);
   records.splice(i,1);removed++;
  }
- saveLastImport(lastImportKeys.filter(key=>!keys.has(key)));
+ catalog.lastImport=(catalog.lastImport||[]).filter(key=>!keys.has(key));
  bulkSelecting=false;bulkSelected.clear();
  storeChanges(catalogKey,catalog);storeChanges(storageKey,reviewData);
  loadCategoryControls();setCategory(category);
@@ -195,7 +191,7 @@ pages.places=pages.places
   .replace('<div class="control"><label for="subcategory">','<div class="control subcategory-filter"><label for="subcategory">')
   .replace('<button class="action" id="export" type="button">تنزيل CSV</button>','<button class="action" id="export" type="button">تنزيل CSV</button><button class="action" id="import-csv" type="button">استيراد CSV</button><button class="action" id="undo-import" type="button" disabled>تراجع عن آخر استيراد</button><button class="action danger-action" id="select-places" type="button">تحديد وحذف</button><button class="action danger-action" id="delete-selected" type="button" hidden disabled>حذف المحدد (٠)</button><button class="action" id="cancel-selection" type="button" hidden>إلغاء التحديد</button><input id="import-csv-file" type="file" accept=".csv,text/csv" hidden>')
   .replace(/(<button[^>]+id="save-place"[^>]*>[^<]*<\/button>)/,'$1<button id="delete-place" class="action danger-action" type="button">حذف المكان</button>')
-  .replace("const catalog=loadLocal(catalogKey,{categories:[],added:[],updates:{}});","const catalog=loadLocal(catalogKey,{categories:[],added:[],updates:{},removed:[]});\ncatalog.removed=Array.isArray(catalog.removed)?catalog.removed:[];\nconst lastImportKey='dalal-last-csv-import-v1';\nlet lastImportKeys=loadLocal(lastImportKey,Array.isArray(catalog.lastImport)?catalog.lastImport:[]);\nif(!Array.isArray(lastImportKeys))lastImportKeys=[];\ndelete catalog.lastImport;")
+  .replace("const catalog=loadLocal(catalogKey,{categories:[],added:[],updates:{}});","const catalog=loadLocal(catalogKey,{categories:[],added:[],updates:{},removed:[],lastImport:[]});\ncatalog.removed=Array.isArray(catalog.removed)?catalog.removed:[];\ncatalog.lastImport=Array.isArray(catalog.lastImport)?catalog.lastImport:[];")
   .replace("let category='',page=1,selected=null,found=[],editing=null,editorCoordinates=[null,null];","let category='',page=1,selected=null,found=[],editing=null,editorCoordinates=[null,null],bulkSelecting=false;\nconst bulkSelected=new Set();")
   .replace("for(const r of records)Object.assign(r,catalog.updates[recordKey(r)]||{});\nrecords.push(...catalog.added);","for(const r of records)Object.assign(r,catalog.updates[recordKey(r)]||{});\nfor(let i=records.length-1;i>=0;i--)if(catalog.removed.includes(recordKey(records[i])))records.splice(i,1);\nrecords.push(...catalog.added);")
   .replace("function init(){",csvImportCode+"\n"+deletePlaceCode+"\nfunction init(){")
@@ -209,7 +205,7 @@ pages.places=pages.places
   .replace("option(byId('state'),'','كل الحالات');\n for(const [key,label] of statuses){\n  option(byId('state'),key,label);option(byId('review-state'),key,label);\n }","option(byId('state'),'','كل المراجعين');\n option(byId('state'),'__none','بدون مراجع');\n for(const name of reviewers)option(byId('state'),name,name);\n for(const [key,label] of statuses)option(byId('review-state'),key,label);")
   .replace("reviewerSelect.value=reviewerOf(r);\n  reviewerSelect.addEventListener('change',()=>{\n   reviewData[recordKey(r)]={...reviewFor(r),reviewer:reviewerSelect.value};\n   storeChanges(storageKey,reviewData);\n  });","reviewerSelect.value=reviewerOf(r);\n  reviewerSelect.addEventListener('change',()=>{\n   reviewData[recordKey(r)]={...reviewFor(r),reviewer:reviewerSelect.value};\n   storeChanges(storageKey,reviewData);\n   render();\n  });")
   .replace("function loadCategoryControls(){","function loadCategoryControls(){\n updateUndoImport();")
-  .replace("Object.assign(catalog,structuredClone(nextCatalog));reviewData=structuredClone(nextReview);","Object.assign(catalog,structuredClone(nextCatalog));catalog.removed=Array.isArray(catalog.removed)?catalog.removed:[];delete catalog.lastImport;reviewData=structuredClone(nextReview);")
+  .replace("Object.assign(catalog,structuredClone(nextCatalog));reviewData=structuredClone(nextReview);","Object.assign(catalog,structuredClone(nextCatalog));catalog.removed=Array.isArray(catalog.removed)?catalog.removed:[];catalog.lastImport=Array.isArray(catalog.lastImport)?catalog.lastImport:[];reviewData=structuredClone(nextReview);")
   .replace("for(const r of records)Object.assign(r,catalog.updates[recordKey(r)]||{});\n records.push(...catalog.added);","for(const r of records)Object.assign(r,catalog.updates[recordKey(r)]||{});\n for(let i=records.length-1;i>=0;i--)if(catalog.removed.includes(recordKey(records[i])))records.splice(i,1);\n records.push(...catalog.added);")
   // Treat visually identical category names as the same category. This covers
   // extra whitespace, Arabic marks, and other harmless import differences.
