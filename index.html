@@ -114,7 +114,9 @@ function deletePlace(){
  byId('place-editor').close();byId('change-notice').textContent='تم حذف المكان.';
 }`;
 pages.places=pages.places
-  .replace('</style>','.danger-action{color:#9f3844;border-color:#d9aeb3}.danger-action:hover{background:#fbeaec;border-color:#c77b84}</style>')
+  .replace('</style>','.danger-action{color:#9f3844;border-color:#d9aeb3}.danger-action:hover{background:#fbeaec;border-color:#c77b84}.subcategory-filter{display:none}</style>')
+  .replace('<div class="control mobile-category"><label for="category">','<div class="control"><label for="category">')
+  .replace('<div class="control"><label for="subcategory">','<div class="control subcategory-filter"><label for="subcategory">')
   .replace('<button class="action" id="export" type="button">تنزيل CSV</button>','<button class="action" id="export" type="button">تنزيل CSV</button><button class="action" id="import-csv" type="button">استيراد CSV</button><input id="import-csv-file" type="file" accept=".csv,text/csv" hidden>')
   .replace(/(<button[^>]+id="save-place"[^>]*>[^<]*<\/button>)/,'$1<button id="delete-place" class="action danger-action" type="button">حذف المكان</button>')
   .replace("const catalog=loadLocal(catalogKey,{categories:[],added:[],updates:{}});","const catalog=loadLocal(catalogKey,{categories:[],added:[],updates:{},removed:[]});\ncatalog.removed=Array.isArray(catalog.removed)?catalog.removed:[];")
