@@ -83,15 +83,33 @@ async function readCsv(event){
   const columns=rows.shift(),selectedCategory=byId('category').value||category;let imported=0;
   for(const values of rows){
    const record=Array(headers.length+1).fill(null);
-   headers.forEach((label,index)=>{const source=columns.indexOf(label);if(source>=0)record[index]=values[source]||null;});
+   const columnIndex=new Map(columns.map((label,index)=>[label.trim(),index]));
+   const copyColumn=(target,...labels)=>{
+    const source=labels.map(label=>columnIndex.get(label)).find(index=>index!==undefined);
+    if(source!==undefined)record[target]=values[source]||null;
+   };
+   headers.forEach((label,index)=>copyColumn(index,label));
+   copyColumn(0,'اسم المكان');
+   copyColumn(1,'وصف المكان');
+   copyColumn(4,'الفئة الرئيسية');
+   copyColumn(5,'الفئة الفرعية');
+   copyColumn(6,'خط العرض');
+   copyColumn(7,'خط الطول');
+   copyColumn(8,'رابط الصورة');
+   copyColumn(9,'الحي أو الموقع المذكور');
+   copyColumn(12,'رقم التواصل');
+   copyColumn(28,'رابط الموقع الإلكتروني أو الحساب الرسمي');
+   copyColumn(29,'رابط خرائط Google','مصدر الإحداثيات');
+   copyColumn(30,'مصدر التوثيق');
    if(selectedCategory)record[4]=selectedCategory;
-   const email=columns.indexOf('البريد الإلكتروني');if(email>=0)record[40]=values[email]||null;
+   copyColumn(40,'البريد الإلكتروني');
    if(!record[0])continue;
    for(const index of [6,7,32,36])if(record[index]!==null&&record[index]!==''&&!Number.isNaN(Number(record[index])))record[index]=Number(record[index]);
    record[30]=record[30]||'استيراد CSV';record[31]=record[31]||crypto.randomUUID();
    records.push(record);catalog.added.push(record);indexRecord(record);
    if(record[4]&&!categories.some(item=>item[0]===record[4])){categories.push([record[4],[]]);catalog.categories.push(record[4]);}
-   const statusColumn=columns.indexOf('حالة مراجعة الدليل'),doneColumn=columns.indexOf('تم'),noteColumn=columns.indexOf('ملاحظات المراجعة'),reviewerColumn=columns.indexOf('المراجع');
+   const findColumn=(...labels)=>labels.map(label=>columnIndex.get(label)).find(index=>index!==undefined)??-1;
+   const statusColumn=findColumn('حالة مراجعة الدليل'),doneColumn=findColumn('تم'),noteColumn=findColumn('ملاحظات المراجعة','ملاحظات التحقق'),reviewerColumn=findColumn('المراجع');
    const statusLabel=statusColumn>=0?values[statusColumn]:'';
    const status=[...statuses].find(item=>item[1]===statusLabel)?.[0]||(doneColumn>=0&&values[doneColumn]==='نعم'?'done':'pending');
    reviewData[recordKey(record)]={status,note:noteColumn>=0?values[noteColumn]||'':'',reviewer:reviewerColumn>=0?values[reviewerColumn]||'':''};
