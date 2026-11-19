@@ -80,11 +80,11 @@ async function readCsv(event){
  try{
   const rows=parseCsv((await file.text()).replace(/^\uFEFF/,''));
   if(rows.length<2)throw new Error('ملف CSV فارغ.');
-  const columns=rows.shift();let imported=0;
+  const columns=rows.shift(),selectedCategory=byId('category').value||category;let imported=0;
   for(const values of rows){
    const record=Array(headers.length+1).fill(null);
    headers.forEach((label,index)=>{const source=columns.indexOf(label);if(source>=0)record[index]=values[source]||null;});
-   if(category)record[4]=category;
+   if(selectedCategory)record[4]=selectedCategory;
    const email=columns.indexOf('البريد الإلكتروني');if(email>=0)record[40]=values[email]||null;
    if(!record[0])continue;
    for(const index of [6,7,32,36])if(record[index]!==null&&record[index]!==''&&!Number.isNaN(Number(record[index])))record[index]=Number(record[index]);
@@ -98,7 +98,7 @@ async function readCsv(event){
    imported++;
   }
   if(!imported)throw new Error('لم يتم العثور على صفوف قابلة للاستيراد.');
-  storeChanges(catalogKey,catalog);storeChanges(storageKey,reviewData);loadCategoryControls();render();
+  storeChanges(catalogKey,catalog);storeChanges(storageKey,reviewData);loadCategoryControls();setCategory(selectedCategory);
   byId('change-notice').textContent='تم استيراد '+numbers.format(imported)+' مكان من CSV.';
  }catch(error){byId('change-notice').textContent=error.message||'تعذّر استيراد ملف CSV.';}
 }`;
