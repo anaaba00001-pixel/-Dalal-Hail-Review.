@@ -126,7 +126,16 @@ pages.places=pages.places
   .replace("editing=record;","editing=record;\n byId('delete-place').hidden=!record;")
   .replace("byId('export').addEventListener('click',exportCsv);","byId('export').addEventListener('click',exportCsv);\n byId('import-csv').addEventListener('click',importCsv);\n byId('import-csv-file').addEventListener('change',readCsv);\n byId('delete-place').addEventListener('click',deletePlace);")
   .replace("Object.assign(catalog,structuredClone(nextCatalog));reviewData=structuredClone(nextReview);","Object.assign(catalog,structuredClone(nextCatalog));catalog.removed=Array.isArray(catalog.removed)?catalog.removed:[];reviewData=structuredClone(nextReview);")
-  .replace("for(const r of records)Object.assign(r,catalog.updates[recordKey(r)]||{});\n records.push(...catalog.added);","for(const r of records)Object.assign(r,catalog.updates[recordKey(r)]||{});\n for(let i=records.length-1;i>=0;i--)if(catalog.removed.includes(recordKey(records[i])))records.splice(i,1);\n records.push(...catalog.added);");
+  .replace("for(const r of records)Object.assign(r,catalog.updates[recordKey(r)]||{});\n records.push(...catalog.added);","for(const r of records)Object.assign(r,catalog.updates[recordKey(r)]||{});\n for(let i=records.length-1;i>=0;i--)if(catalog.removed.includes(recordKey(records[i])))records.splice(i,1);\n records.push(...catalog.added);")
+  // Treat visually identical category names as the same category. This covers
+  // extra whitespace, Arabic marks, and other harmless import differences.
+  .replace("const searchIndex=new Map();","const categoryToken=value=>normalize(value).trim().replace(/\\s+/g,' ');\nconst sameCategory=(left,right)=>categoryToken(left)===categoryToken(right);\nconst searchIndex=new Map();")
+  .replace("for(const [n] of categories)categoryCounts.set(n,0);\n for(const r of records)categoryCounts.set(r[4],(categoryCounts.get(r[4])||0)+1);","for(const [n] of categories)categoryCounts.set(n,records.filter(r=>sameCategory(r[4],n)).length);")
+  .replace("const listed=categories.find(c=>c[0]===value)?.[1]||[];","const listed=categories.find(c=>sameCategory(c[0],value))?.[1]||[];")
+  .replace("if(value&&records.some(r=>r[4]===value&&!r[5]))","if(value&&records.some(r=>sameCategory(r[4],value)&&!r[5]))")
+  .replace("return records.filter(r=>(!category||r[4]===category)","return records.filter(r=>(!category||sameCategory(r[4],category))")
+  .replace("&&(!sub||(sub==='__root'?!r[5]:r[5]===sub))","&&(!sub||(sub==='__root'?!r[5]:sameCategory(r[5],sub)))")
+  .replace("const scope=category?records.filter(r=>r[4]===category):records;","const scope=category?records.filter(r=>sameCategory(r[4],category)):records;");
 const loaded=new Set();
 for(const key of Object.keys(pages)){
   document.getElementById(key).addEventListener('load',event=>{
