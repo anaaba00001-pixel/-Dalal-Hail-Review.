@@ -146,6 +146,33 @@ function undoLastImport(){
  byId('change-notice').textContent='تم التراجع عن آخر استيراد وحذف '+numbers.format(removed)+' مكان.';
 }`;
 const deletePlaceCode=String.raw`
+function updateBulkDeleteButtons(){
+ const start=byId('select-places'),remove=byId('delete-selected'),cancel=byId('cancel-selection');
+ if(!start||!remove||!cancel)return;
+ start.hidden=bulkSelecting;remove.hidden=!bulkSelecting;cancel.hidden=!bulkSelecting;
+ remove.disabled=bulkSelected.size===0;
+ remove.textContent='حذف المحدد ('+numbers.format(bulkSelected.size)+')';
+}
+function beginBulkDelete(){bulkSelecting=true;bulkSelected.clear();render();}
+function cancelBulkDelete(){bulkSelecting=false;bulkSelected.clear();render();}
+function deleteSelectedPlaces(){
+ if(!bulkSelected.size)return;
+ if(!confirm('هل تريدين حذف '+numbers.format(bulkSelected.size)+' مكان محدد؟ لا يمكن التراجع عن الحذف.'))return;
+ const keys=new Set(bulkSelected);let removed=0;
+ for(let i=records.length-1;i>=0;i--){
+  const record=records[i],key=recordKey(record);if(!keys.has(key))continue;
+  const addedIndex=catalog.added.findIndex(item=>recordKey(item)===key);
+  if(addedIndex>=0)catalog.added.splice(addedIndex,1);
+  else if(!catalog.removed.includes(key))catalog.removed.push(key);
+  delete catalog.updates[key];delete reviewData[key];searchIndex.delete(record);
+  records.splice(i,1);removed++;
+ }
+ catalog.lastImport=(catalog.lastImport||[]).filter(key=>!keys.has(key));
+ bulkSelecting=false;bulkSelected.clear();
+ storeChanges(catalogKey,catalog);storeChanges(storageKey,reviewData);
+ loadCategoryControls();setCategory(category);
+ byId('change-notice').textContent='تم حذف '+numbers.format(removed)+' مكان محدد.';
+}
 function deletePlace(){
  const record=editing;if(!record||!confirm('هل تريدين حذف «'+record[0]+'»؟ لا يمكن التراجع عن الحذف.'))return;
  const key=recordKey(record),addedIndex=catalog.added.findIndex(item=>recordKey(item)===key);
@@ -158,16 +185,19 @@ function deletePlace(){
  byId('place-editor').close();byId('change-notice').textContent='تم حذف المكان.';
 }`;
 pages.places=pages.places
-  .replace('</style>','.danger-action{color:#9f3844;border-color:#d9aeb3}.danger-action:hover{background:#fbeaec;border-color:#c77b84}.subcategory-filter{display:none}</style>')
+  .replace('</style>','.danger-action{color:#9f3844;border-color:#d9aeb3}.danger-action:hover{background:#fbeaec;border-color:#c77b84}.subcategory-filter{display:none}.bulk-select{width:18px;height:18px;margin:0 0 0 9px;vertical-align:middle;accent-color:#8b2242}</style>')
   .replace('<div class="control mobile-category"><label for="category">','<div class="control"><label for="category">')
   .replace('<div class="control"><label for="subcategory">','<div class="control subcategory-filter"><label for="subcategory">')
-  .replace('<button class="action" id="export" type="button">تنزيل CSV</button>','<button class="action" id="export" type="button">تنزيل CSV</button><button class="action" id="import-csv" type="button">استيراد CSV</button><button class="action" id="undo-import" type="button" disabled>تراجع عن آخر استيراد</button><input id="import-csv-file" type="file" accept=".csv,text/csv" hidden>')
+  .replace('<button class="action" id="export" type="button">تنزيل CSV</button>','<button class="action" id="export" type="button">تنزيل CSV</button><button class="action" id="import-csv" type="button">استيراد CSV</button><button class="action" id="undo-import" type="button" disabled>تراجع عن آخر استيراد</button><button class="action danger-action" id="select-places" type="button">تحديد وحذف</button><button class="action danger-action" id="delete-selected" type="button" hidden disabled>حذف المحدد (٠)</button><button class="action" id="cancel-selection" type="button" hidden>إلغاء التحديد</button><input id="import-csv-file" type="file" accept=".csv,text/csv" hidden>')
   .replace(/(<button[^>]+id="save-place"[^>]*>[^<]*<\/button>)/,'$1<button id="delete-place" class="action danger-action" type="button">حذف المكان</button>')
   .replace("const catalog=loadLocal(catalogKey,{categories:[],added:[],updates:{}});","const catalog=loadLocal(catalogKey,{categories:[],added:[],updates:{},removed:[],lastImport:[]});\ncatalog.removed=Array.isArray(catalog.removed)?catalog.removed:[];\ncatalog.lastImport=Array.isArray(catalog.lastImport)?catalog.lastImport:[];")
+  .replace("let category='',page=1,selected=null,found=[],editing=null,editorCoordinates=[null,null];","let category='',page=1,selected=null,found=[],editing=null,editorCoordinates=[null,null],bulkSelecting=false;\nconst bulkSelected=new Set();")
   .replace("for(const r of records)Object.assign(r,catalog.updates[recordKey(r)]||{});\nrecords.push(...catalog.added);","for(const r of records)Object.assign(r,catalog.updates[recordKey(r)]||{});\nfor(let i=records.length-1;i>=0;i--)if(catalog.removed.includes(recordKey(records[i])))records.splice(i,1);\nrecords.push(...catalog.added);")
   .replace("function init(){",csvImportCode+"\n"+deletePlaceCode+"\nfunction init(){")
   .replace("editing=record;","editing=record;\n byId('delete-place').hidden=!record;")
-  .replace("byId('export').addEventListener('click',exportCsv);","byId('export').addEventListener('click',exportCsv);\n byId('import-csv').addEventListener('click',importCsv);\n byId('import-csv-file').addEventListener('change',readCsv);\n byId('undo-import').addEventListener('click',undoLastImport);\n byId('delete-place').addEventListener('click',deletePlace);")
+  .replace("byId('export').addEventListener('click',exportCsv);","byId('export').addEventListener('click',exportCsv);\n byId('import-csv').addEventListener('click',importCsv);\n byId('import-csv-file').addEventListener('change',readCsv);\n byId('undo-import').addEventListener('click',undoLastImport);\n byId('select-places').addEventListener('click',beginBulkDelete);\n byId('delete-selected').addEventListener('click',deleteSelectedPlaces);\n byId('cancel-selection').addEventListener('click',cancelBulkDelete);\n byId('delete-place').addEventListener('click',deletePlace);")
+  .replace("const title=node('td');const placeTitle=node('div',undefined,'place-title');","const title=node('td');\n   if(bulkSelecting){\n    const selectBox=node('input',undefined,'bulk-select');selectBox.type='checkbox';selectBox.checked=bulkSelected.has(recordKey(r));\n    selectBox.setAttribute('aria-label','تحديد '+r[0]);selectBox.addEventListener('change',()=>{if(selectBox.checked)bulkSelected.add(recordKey(r));else bulkSelected.delete(recordKey(r));updateBulkDeleteButtons();});title.append(selectBox);\n   }\n   const placeTitle=node('div',undefined,'place-title');")
+  .replace("body.replaceChildren(results);","body.replaceChildren(results);\n updateBulkDeleteButtons();")
   .replace("function loadCategoryControls(){","function loadCategoryControls(){\n updateUndoImport();")
   .replace("Object.assign(catalog,structuredClone(nextCatalog));reviewData=structuredClone(nextReview);","Object.assign(catalog,structuredClone(nextCatalog));catalog.removed=Array.isArray(catalog.removed)?catalog.removed:[];catalog.lastImport=Array.isArray(catalog.lastImport)?catalog.lastImport:[];reviewData=structuredClone(nextReview);")
   .replace("for(const r of records)Object.assign(r,catalog.updates[recordKey(r)]||{});\n records.push(...catalog.added);","for(const r of records)Object.assign(r,catalog.updates[recordKey(r)]||{});\n for(let i=records.length-1;i>=0;i--)if(catalog.removed.includes(recordKey(records[i])))records.splice(i,1);\n records.push(...catalog.added);")
