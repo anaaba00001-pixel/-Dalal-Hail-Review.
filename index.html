@@ -80,7 +80,7 @@ async function readCsv(event){
  try{
   const rows=parseCsv((await file.text()).replace(/^\uFEFF/,''));
   if(rows.length<2)throw new Error('ملف CSV فارغ.');
-  const columns=rows.shift(),selectedCategory=byId('category').value||category;let imported=0;
+   const columns=rows.shift(),selectedCategory=byId('category').value||category,importedKeys=[];let imported=0;
   for(const values of rows){
    const record=Array(headers.length+1).fill(null);
    const columnIndex=new Map(columns.map((label,index)=>[label.trim(),index]));
@@ -106,7 +106,7 @@ async function readCsv(event){
    if(!record[0])continue;
    for(const index of [6,7,32,36])if(record[index]!==null&&record[index]!==''&&!Number.isNaN(Number(record[index])))record[index]=Number(record[index]);
    record[30]=record[30]||'استيراد CSV';record[31]=record[31]||crypto.randomUUID();
-   records.push(record);catalog.added.push(record);indexRecord(record);
+    records.push(record);catalog.added.push(record);indexRecord(record);importedKeys.push(recordKey(record));
    if(record[4]&&!categories.some(item=>item[0]===record[4])){categories.push([record[4],[]]);catalog.categories.push(record[4]);}
    const findColumn=(...labels)=>labels.map(label=>columnIndex.get(label)).find(index=>index!==undefined)??-1;
    const statusColumn=findColumn('حالة مراجعة الدليل'),doneColumn=findColumn('تم'),noteColumn=findColumn('ملاحظات المراجعة','ملاحظات التحقق'),reviewerColumn=findColumn('المراجع');
@@ -116,9 +116,34 @@ async function readCsv(event){
    imported++;
   }
   if(!imported)throw new Error('لم يتم العثور على صفوف قابلة للاستيراد.');
-  storeChanges(catalogKey,catalog);storeChanges(storageKey,reviewData);loadCategoryControls();setCategory(selectedCategory);
+   catalog.lastImport=importedKeys;
+   storeChanges(catalogKey,catalog);storeChanges(storageKey,reviewData);loadCategoryControls();setCategory(selectedCategory);
   byId('change-notice').textContent='تم استيراد '+numbers.format(imported)+' مكان من CSV.';
  }catch(error){byId('change-notice').textContent=error.message||'تعذّر استيراد ملف CSV.';}
+ }
+function updateUndoImport(){
+ const button=byId('undo-import');
+ if(button)button.disabled=!Array.isArray(catalog.lastImport)||catalog.lastImport.length===0;
+}
+function undoLastImport(){
+ const keys=Array.isArray(catalog.lastImport)?catalog.lastImport:[];
+ if(!keys.length)return;
+ if(!confirm('هل تريدين التراجع عن آخر استيراد وحذف الأماكن التي أضيفت فيه؟'))return;
+ const imported=new Set(keys);let removed=0;
+ for(let i=catalog.added.length-1;i>=0;i--){
+  const record=catalog.added[i];
+  if(!imported.has(recordKey(record)))continue;
+  catalog.added.splice(i,1);searchIndex.delete(record);removed++;
+ }
+ for(let i=records.length-1;i>=0;i--){
+  const key=recordKey(records[i]);
+  if(!imported.has(key))continue;
+  records.splice(i,1);delete reviewData[key];
+ }
+ catalog.lastImport=[];
+ storeChanges(catalogKey,catalog);storeChanges(storageKey,reviewData);
+ loadCategoryControls();setCategory(category);
+ byId('change-notice').textContent='تم التراجع عن آخر استيراد وحذف '+numbers.format(removed)+' مكان.';
 }`;
 const deletePlaceCode=String.raw`
 function deletePlace(){
@@ -136,14 +161,15 @@ pages.places=pages.places
   .replace('</style>','.danger-action{color:#9f3844;border-color:#d9aeb3}.danger-action:hover{background:#fbeaec;border-color:#c77b84}.subcategory-filter{display:none}</style>')
   .replace('<div class="control mobile-category"><label for="category">','<div class="control"><label for="category">')
   .replace('<div class="control"><label for="subcategory">','<div class="control subcategory-filter"><label for="subcategory">')
-  .replace('<button class="action" id="export" type="button">تنزيل CSV</button>','<button class="action" id="export" type="button">تنزيل CSV</button><button class="action" id="import-csv" type="button">استيراد CSV</button><input id="import-csv-file" type="file" accept=".csv,text/csv" hidden>')
+  .replace('<button class="action" id="export" type="button">تنزيل CSV</button>','<button class="action" id="export" type="button">تنزيل CSV</button><button class="action" id="import-csv" type="button">استيراد CSV</button><button class="action" id="undo-import" type="button" disabled>تراجع عن آخر استيراد</button><input id="import-csv-file" type="file" accept=".csv,text/csv" hidden>')
   .replace(/(<button[^>]+id="save-place"[^>]*>[^<]*<\/button>)/,'$1<button id="delete-place" class="action danger-action" type="button">حذف المكان</button>')
-  .replace("const catalog=loadLocal(catalogKey,{categories:[],added:[],updates:{}});","const catalog=loadLocal(catalogKey,{categories:[],added:[],updates:{},removed:[]});\ncatalog.removed=Array.isArray(catalog.removed)?catalog.removed:[];")
+  .replace("const catalog=loadLocal(catalogKey,{categories:[],added:[],updates:{}});","const catalog=loadLocal(catalogKey,{categories:[],added:[],updates:{},removed:[],lastImport:[]});\ncatalog.removed=Array.isArray(catalog.removed)?catalog.removed:[];\ncatalog.lastImport=Array.isArray(catalog.lastImport)?catalog.lastImport:[];")
   .replace("for(const r of records)Object.assign(r,catalog.updates[recordKey(r)]||{});\nrecords.push(...catalog.added);","for(const r of records)Object.assign(r,catalog.updates[recordKey(r)]||{});\nfor(let i=records.length-1;i>=0;i--)if(catalog.removed.includes(recordKey(records[i])))records.splice(i,1);\nrecords.push(...catalog.added);")
   .replace("function init(){",csvImportCode+"\n"+deletePlaceCode+"\nfunction init(){")
   .replace("editing=record;","editing=record;\n byId('delete-place').hidden=!record;")
-  .replace("byId('export').addEventListener('click',exportCsv);","byId('export').addEventListener('click',exportCsv);\n byId('import-csv').addEventListener('click',importCsv);\n byId('import-csv-file').addEventListener('change',readCsv);\n byId('delete-place').addEventListener('click',deletePlace);")
-  .replace("Object.assign(catalog,structuredClone(nextCatalog));reviewData=structuredClone(nextReview);","Object.assign(catalog,structuredClone(nextCatalog));catalog.removed=Array.isArray(catalog.removed)?catalog.removed:[];reviewData=structuredClone(nextReview);")
+  .replace("byId('export').addEventListener('click',exportCsv);","byId('export').addEventListener('click',exportCsv);\n byId('import-csv').addEventListener('click',importCsv);\n byId('import-csv-file').addEventListener('change',readCsv);\n byId('undo-import').addEventListener('click',undoLastImport);\n byId('delete-place').addEventListener('click',deletePlace);")
+  .replace("function loadCategoryControls(){","function loadCategoryControls(){\n updateUndoImport();")
+  .replace("Object.assign(catalog,structuredClone(nextCatalog));reviewData=structuredClone(nextReview);","Object.assign(catalog,structuredClone(nextCatalog));catalog.removed=Array.isArray(catalog.removed)?catalog.removed:[];catalog.lastImport=Array.isArray(catalog.lastImport)?catalog.lastImport:[];reviewData=structuredClone(nextReview);")
   .replace("for(const r of records)Object.assign(r,catalog.updates[recordKey(r)]||{});\n records.push(...catalog.added);","for(const r of records)Object.assign(r,catalog.updates[recordKey(r)]||{});\n for(let i=records.length-1;i>=0;i--)if(catalog.removed.includes(recordKey(records[i])))records.splice(i,1);\n records.push(...catalog.added);")
   // Treat visually identical category names as the same category. This covers
   // extra whitespace, Arabic marks, and other harmless import differences.
