@@ -84,6 +84,7 @@ async function readCsv(event){
   for(const values of rows){
    const record=Array(headers.length+1).fill(null);
    headers.forEach((label,index)=>{const source=columns.indexOf(label);if(source>=0)record[index]=values[source]||null;});
+   if(category)record[4]=category;
    const email=columns.indexOf('البريد الإلكتروني');if(email>=0)record[40]=values[email]||null;
    if(!record[0])continue;
    for(const index of [6,7,32,36])if(record[index]!==null&&record[index]!==''&&!Number.isNaN(Number(record[index])))record[index]=Number(record[index]);
