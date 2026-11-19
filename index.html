@@ -58,6 +58,53 @@ noscript{display:block;padding:16px}
 <script>
 'use strict';
 const pages=JSON.parse(document.getElementById('pages').textContent);
+const csvImportCode=String.raw`
+function parseCsv(text){
+ const rows=[];let row=[],cell='',quoted=false;
+ for(let i=0;i<text.length;i++){
+  const char=text[i];
+  if(quoted&&char==='"'&&text[i+1]==='"'){cell+='"';i++;}
+  else if(char==='"'){quoted=!quoted;}
+  else if(char===','&&!quoted){row.push(cell);cell='';}
+  else if((char==='\n'||char==='\r')&&!quoted){
+   if(char==='\r'&&text[i+1]==='\n')i++;
+   row.push(cell);if(row.some(value=>value!==''))rows.push(row);row=[];cell='';
+  }else cell+=char;
+ }
+ row.push(cell);if(row.some(value=>value!==''))rows.push(row);
+ return rows;
+}
+function importCsv(){byId('import-csv-file').click();}
+async function readCsv(event){
+ const file=event.target.files[0];event.target.value='';if(!file)return;
+ try{
+  const rows=parseCsv((await file.text()).replace(/^\uFEFF/,''));
+  if(rows.length<2)throw new Error('ملف CSV فارغ.');
+  const columns=rows.shift();let imported=0;
+  for(const values of rows){
+   const record=Array(headers.length+1).fill(null);
+   headers.forEach((label,index)=>{const source=columns.indexOf(label);if(source>=0)record[index]=values[source]||null;});
+   const email=columns.indexOf('البريد الإلكتروني');if(email>=0)record[40]=values[email]||null;
+   if(!record[0])continue;
+   for(const index of [6,7,32,36])if(record[index]!==null&&record[index]!==''&&!Number.isNaN(Number(record[index])))record[index]=Number(record[index]);
+   record[30]=record[30]||'استيراد CSV';record[31]=record[31]||crypto.randomUUID();
+   records.push(record);catalog.added.push(record);indexRecord(record);
+   if(record[4]&&!categories.some(item=>item[0]===record[4])){categories.push([record[4],[]]);catalog.categories.push(record[4]);}
+   const statusColumn=columns.indexOf('حالة مراجعة الدليل'),doneColumn=columns.indexOf('تم'),noteColumn=columns.indexOf('ملاحظات المراجعة'),reviewerColumn=columns.indexOf('المراجع');
+   const statusLabel=statusColumn>=0?values[statusColumn]:'';
+   const status=[...statuses].find(item=>item[1]===statusLabel)?.[0]||(doneColumn>=0&&values[doneColumn]==='نعم'?'done':'pending');
+   reviewData[recordKey(record)]={status,note:noteColumn>=0?values[noteColumn]||'':'',reviewer:reviewerColumn>=0?values[reviewerColumn]||'':''};
+   imported++;
+  }
+  if(!imported)throw new Error('لم يتم العثور على صفوف قابلة للاستيراد.');
+  storeChanges(catalogKey,catalog);storeChanges(storageKey,reviewData);loadCategoryControls();render();
+  byId('change-notice').textContent='تم استيراد '+numbers.format(imported)+' مكان من CSV.';
+ }catch(error){byId('change-notice').textContent=error.message||'تعذّر استيراد ملف CSV.';}
+}`;
+pages.places=pages.places
+  .replace('<button class="action" id="export" type="button">تنزيل CSV</button>','<button class="action" id="export" type="button">تنزيل CSV</button><button class="action" id="import-csv" type="button">استيراد CSV</button><input id="import-csv-file" type="file" accept=".csv,text/csv" hidden>')
+  .replace("function init(){",csvImportCode+"\nfunction init(){")
+  .replace("byId('export').addEventListener('click',exportCsv);","byId('export').addEventListener('click',exportCsv);\n byId('import-csv').addEventListener('click',importCsv);\n byId('import-csv-file').addEventListener('change',readCsv);");
 const loaded=new Set();
 for(const key of Object.keys(pages)){
   document.getElementById(key).addEventListener('load',event=>{
