@@ -58,6 +58,11 @@ noscript{display:block;padding:16px}
 <script>
 'use strict';
 const pages=JSON.parse(document.getElementById('pages').textContent);
+const csvImportUi=String.raw`
+<style>
+#csv-review{width:min(1050px,calc(100% - 24px));max-height:90vh;padding:0;overflow:hidden}#csv-review::backdrop{background:#2b183975}.csv-review-head{display:flex;align-items:start;justify-content:space-between;gap:16px;padding:18px 20px;border-bottom:1px solid #e7dfe3;background:#fffdfa}.csv-review-head h2{margin:0}.csv-review-head p{margin:5px 0 0;color:#625763}.csv-review-body{padding:16px 20px;overflow:auto;max-height:calc(90vh - 150px)}.csv-summary{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:16px}.csv-stat{padding:12px;border:1px solid #e7dfe3;border-radius:12px;background:#fff}.csv-stat strong{display:block;font-size:1.35rem}.csv-group{margin:14px 0}.csv-group>h3{margin:0 0 5px}.csv-list{display:grid;gap:9px}.csv-item{display:grid;grid-template-columns:auto minmax(0,1fr);gap:10px;padding:12px;border:1px solid #e1d6e0;border-radius:12px;background:#fff}.csv-item.conflict{border-color:#d49a45;background:#fffaf0}.csv-item.duplicate{border-color:#c6bac7;background:#faf7fa}.csv-item input{margin-top:5px;width:18px;height:18px;accent-color:#4a2a51}.csv-item-title{display:flex;gap:8px;align-items:center;flex-wrap:wrap}.csv-badge{padding:2px 8px;border-radius:999px;background:#eee5ee;font-size:.78rem;font-weight:800}.csv-fields{display:grid;gap:4px;margin-top:7px;font-size:.88rem}.csv-change{display:grid;grid-template-columns:minmax(100px,.55fr) 1fr 1fr;gap:7px;padding-top:4px;border-top:1px solid #eee5ec}.csv-change b{color:#5a465b}.csv-old{color:#8b3e49}.csv-new{color:#245c49}.csv-actions{position:sticky;bottom:0;display:flex;gap:8px;align-items:center;flex-wrap:wrap;padding:12px 20px;border-top:1px solid #e7dfe3;background:#fffdfa}.csv-actions .primary{margin-inline-start:auto}.csv-empty{color:#625763;padding:9px 0}@media(max-width:650px){.csv-summary{grid-template-columns:1fr}.csv-change{grid-template-columns:1fr}.csv-review-head{padding:14px}.csv-review-body{padding:12px}.csv-actions{padding:10px 12px}}
+</style>
+<dialog id="csv-review" aria-labelledby="csv-review-title"><div class="csv-review-head"><div><h2 id="csv-review-title">مراجعة استيراد CSV</h2><p id="csv-review-file"></p></div><button class="action" id="csv-review-close" type="button">إلغاء</button></div><div class="csv-review-body"><div id="csv-summary" class="csv-summary"></div><div id="csv-review-groups"></div></div><div class="csv-actions"><button class="action" id="csv-select-new" type="button">تحديد الجديد فقط</button><button class="action" id="csv-select-all" type="button">تحديد الكل</button><button class="action" id="csv-clear-all" type="button">إلغاء التحديد</button><button class="primary" id="csv-approve" type="button">اعتماد المحدد</button></div></dialog>`;
 const csvImportCode=String.raw`
 function parseCsv(text){
  const rows=[];let row=[],cell='',quoted=false;
@@ -75,52 +80,49 @@ function parseCsv(text){
  return rows;
 }
 function importCsv(){byId('import-csv-file').click();}
+let pendingCsv=[];
+const csvAliases=new Map([['اسم المكان',0],['اسم المكان أو الفرع',0],['وصف المكان',1],['الوصف للزائر',1],['المدينة',2],['الدولة',3],['الفئة الرئيسية',4],['الفئة الفرعية',5],['خط العرض',6],['خط الطول',7],['رابط الصورة',8],['صورة الغلاف أو ملف الصور',8],['الحي أو الموقع المذكور',9],['العنوان',9],['رقم التواصل',12],['رابط الموقع الإلكتروني أو الحساب الرسمي',28],['الموقع الإلكتروني أو الحساب العام',28],['رابط خرائط Google',29],['رابط الخريطة المرجعي',29],['مصدر الإحداثيات',29],['مصدر التوثيق',30],['المصدر أو جهة التأكيد',30],['البريد الإلكتروني',40]]);
+const cleanCsvValue=value=>String(value??'').trim();
+const comparable=value=>normalize(cleanCsvValue(value)).trim().replace(/\s+/g,' ');
+const csvIdentity=record=>{const name=comparable(record[0]),phone=cleanCsvValue(record[12]).replace(/\D/g,'').slice(-9),map=comparable(record[29]),lat=Number(record[6]),lng=Number(record[7]),coords=Number.isFinite(lat)&&Number.isFinite(lng)?lat.toFixed(4)+','+lng.toFixed(4):'';return{name,phone,map,coords};};
+function findCsvMatch(record){const incoming=csvIdentity(record);return records.find(current=>{const existing=csvIdentity(current);if(!incoming.name||incoming.name!==existing.name)return false;const signals=[incoming.phone&&incoming.phone===existing.phone,incoming.map&&incoming.map===existing.map,incoming.coords&&incoming.coords===existing.coords];return signals.some(Boolean)||(!incoming.phone&&!incoming.map&&!incoming.coords);})||null;}
+function csvDifferences(incoming,existing){const changes=[];for(let index=0;index<incoming.length;index++){const next=cleanCsvValue(incoming[index]);if(!next)continue;const current=cleanCsvValue(existing?.[index]);if(comparable(next)!==comparable(current))changes.push({index,label:index===40?'البريد الإلكتروني':headers[index]||('الحقل '+(index+1)),current,next});}return changes;}
+function csvReviewData(columns,rows){
+ const seen=new Map(),output=[];
+ for(const values of rows){
+  const record=Array(headers.length+1).fill(null);
+  columns.forEach((label,source)=>{const index=csvAliases.get(cleanCsvValue(label));if(index!==undefined)record[index]=cleanCsvValue(values[source])||null;});
+  headers.forEach((label,index)=>{const source=columns.indexOf(label);if(source>=0)record[index]=cleanCsvValue(values[source])||null;});
+  if(!record[0])continue;for(const index of [6,7,32,36])if(record[index]!==null&&record[index]!==''&&!Number.isNaN(Number(record[index])))record[index]=Number(record[index]);
+  record[30]=record[30]||'استيراد CSV';record[31]=record[31]||crypto.randomUUID();
+  const identity=csvIdentity(record),batchKey=[identity.name,identity.phone,identity.map,identity.coords].join('|'),batchMatch=seen.get(batchKey),existing=batchMatch?.record||findCsvMatch(record),differences=existing?csvDifferences(record,existing):[],type=existing?(differences.length?'conflict':'duplicate'):'new';
+  const columnIndex=new Map(columns.map((label,index)=>[label,index])),findColumn=(...labels)=>labels.map(label=>columnIndex.get(label)).find(index=>index!==undefined)??-1,statusColumn=findColumn('حالة مراجعة الدليل'),doneColumn=findColumn('تم'),noteColumn=findColumn('ملاحظات المراجعة','ملاحظات التحقق'),reviewerColumn=findColumn('المراجع'),statusLabel=statusColumn>=0?values[statusColumn]:'',status=[...statuses].find(item=>item[1]===statusLabel)?.[0]||(doneColumn>=0&&values[doneColumn]==='نعم'?'done':'pending');
+  const item={record,existing,type,differences,selected:type==='new',review:{status,note:noteColumn>=0?values[noteColumn]||'':'',reviewer:reviewerColumn>=0?values[reviewerColumn]||'':''}};output.push(item);if(!seen.has(batchKey))seen.set(batchKey,item);
+ }return output;
+}
+function renderCsvReview(fileName){
+ const labels={new:'جديد',conflict:'تعارض',duplicate:'مكرر'},descriptions={new:'أماكن غير موجودة وستُضاف عند الاعتماد.',conflict:'أماكن موجودة لكن بعض بياناتها مختلفة. اعتمادها يستبدل الحقول الظاهرة بالقيم الجديدة.',duplicate:'صفوف مطابقة لبيانات موجودة. اتركيها بدون تحديد لتجنب نسخة إضافية.'};
+ const summary=byId('csv-summary');summary.replaceChildren();for(const type of ['new','conflict','duplicate']){const box=node('div',undefined,'csv-stat');box.append(node('strong',numbers.format(pendingCsv.filter(item=>item.type===type).length)),node('span',labels[type]));summary.append(box);}
+ const groups=byId('csv-review-groups');groups.replaceChildren();
+ for(const type of ['conflict','duplicate','new']){const items=pendingCsv.filter(item=>item.type===type),section=node('section',undefined,'csv-group');section.append(node('h3',labels[type]+' ('+numbers.format(items.length)+')'),node('p',descriptions[type],'muted'));const list=node('div',undefined,'csv-list');if(!items.length)list.append(node('div','لا توجد سجلات في هذه المجموعة.','csv-empty'));
+  for(const item of items){const row=node('label',undefined,'csv-item '+type),check=node('input');check.type='checkbox';check.checked=item.selected;check.addEventListener('change',()=>item.selected=check.checked);const body=node('div'),title=node('div',undefined,'csv-item-title');title.append(node('strong',item.record[0]),node('span',labels[type],'csv-badge'));if(item.record[4])title.append(node('span',item.record[4],'muted'));body.append(title);const fields=node('div',undefined,'csv-fields');if(type==='new'){for(const [label,value] of [['الفئة',item.record[4]],['الهاتف',item.record[12]],['الموقع',item.record[9]],['رابط الخريطة',item.record[29]]])if(value)fields.append(node('div',label+': '+value));}else if(type==='duplicate')fields.append(node('div','مطابق للسجل الموجود ولن يُضاف مرة أخرى إلا إذا حددتِه.'));else for(const change of item.differences){const line=node('div',undefined,'csv-change');line.append(node('b',change.label),node('span','الحالي: '+(change.current||'فارغ'),'csv-old'),node('span','الجديد: '+change.next,'csv-new'));fields.append(line);}body.append(fields);row.append(check,body);list.append(row);}section.append(list);groups.append(section);
+ }
+ byId('csv-review-file').textContent=fileName+' — حددي ما تريدين اعتماده بعد مراجعة المقارنة.';if(!byId('csv-review').open)byId('csv-review').showModal();
+}
 async function readCsv(event){
  const file=event.target.files[0];event.target.value='';if(!file)return;
  try{
   const rows=parseCsv((await file.text()).replace(/^\uFEFF/,''));
   if(rows.length<2)throw new Error('ملف CSV فارغ.');
-   const columns=rows.shift(),selectedCategory=byId('category').value||category,importedKeys=[];let imported=0;
-  for(const values of rows){
-   const record=Array(headers.length+1).fill(null);
-   const columnIndex=new Map(columns.map((label,index)=>[label.trim(),index]));
-   const copyColumn=(target,...labels)=>{
-    const source=labels.map(label=>columnIndex.get(label)).find(index=>index!==undefined);
-    if(source!==undefined)record[target]=values[source]||null;
-   };
-   headers.forEach((label,index)=>copyColumn(index,label));
-   copyColumn(0,'اسم المكان');
-   copyColumn(1,'وصف المكان');
-   copyColumn(4,'الفئة الرئيسية');
-   copyColumn(5,'الفئة الفرعية');
-   copyColumn(6,'خط العرض');
-   copyColumn(7,'خط الطول');
-   copyColumn(8,'رابط الصورة');
-   copyColumn(9,'الحي أو الموقع المذكور');
-   copyColumn(12,'رقم التواصل');
-   copyColumn(28,'رابط الموقع الإلكتروني أو الحساب الرسمي');
-   copyColumn(29,'رابط خرائط Google','مصدر الإحداثيات');
-   copyColumn(30,'مصدر التوثيق');
-   if(selectedCategory)record[4]=selectedCategory;
-   copyColumn(40,'البريد الإلكتروني');
-   if(!record[0])continue;
-   for(const index of [6,7,32,36])if(record[index]!==null&&record[index]!==''&&!Number.isNaN(Number(record[index])))record[index]=Number(record[index]);
-   record[30]=record[30]||'استيراد CSV';record[31]=record[31]||crypto.randomUUID();
-    records.push(record);catalog.added.push(record);indexRecord(record);importedKeys.push(recordKey(record));
-   if(record[4]&&!categories.some(item=>item[0]===record[4])){categories.push([record[4],[]]);catalog.categories.push(record[4]);}
-   const findColumn=(...labels)=>labels.map(label=>columnIndex.get(label)).find(index=>index!==undefined)??-1;
-   const statusColumn=findColumn('حالة مراجعة الدليل'),doneColumn=findColumn('تم'),noteColumn=findColumn('ملاحظات المراجعة','ملاحظات التحقق'),reviewerColumn=findColumn('المراجع');
-   const statusLabel=statusColumn>=0?values[statusColumn]:'';
-   const status=[...statuses].find(item=>item[1]===statusLabel)?.[0]||(doneColumn>=0&&values[doneColumn]==='نعم'?'done':'pending');
-   reviewData[recordKey(record)]={status,note:noteColumn>=0?values[noteColumn]||'':'',reviewer:reviewerColumn>=0?values[reviewerColumn]||'':''};
-   imported++;
-  }
-  if(!imported)throw new Error('لم يتم العثور على صفوف قابلة للاستيراد.');
-   saveLastImport(importedKeys);
-   storeChanges(catalogKey,catalog);storeChanges(storageKey,reviewData);loadCategoryControls();setCategory(selectedCategory);
-  byId('change-notice').textContent='تم استيراد '+numbers.format(imported)+' مكان من CSV.';
+  const columns=rows.shift().map(cleanCsvValue);pendingCsv=csvReviewData(columns,rows);if(!pendingCsv.length)throw new Error('لم يتم العثور على صفوف قابلة للاستيراد. تأكدي من وجود عمود «اسم المكان».');renderCsvReview(file.name);
  }catch(error){byId('change-notice').textContent=error.message||'تعذّر استيراد ملف CSV.';}
- }
+}
+function selectCsvItems(mode){for(const item of pendingCsv)item.selected=mode==='all'||(mode==='new'&&item.type==='new');renderCsvReview(byId('csv-review-file').textContent.split(' — ')[0]);}
+function approveCsv(){
+ const selected=pendingCsv.filter(item=>item.selected);if(!selected.length){byId('change-notice').textContent='لم يتم تحديد أي سجل للاعتماد.';byId('csv-review').close();return;}const importedKeys=[];let added=0,updated=0,duplicated=0;
+ for(const item of selected){const record=item.record;if(item.type==='conflict'&&item.existing&&records.includes(item.existing)){const target=item.existing,oldKey=recordKey(target),changes={};for(const change of item.differences){target[change.index]=record[change.index];changes[change.index]=record[change.index];}if(target[30]!=='إضافة من واجهة المراجعة'&&!catalog.added.includes(target))catalog.updates[oldKey]={...catalog.updates[oldKey],...changes};reviewData[recordKey(target)]={...reviewFor(target),...item.review};indexRecord(target);updated++;}else{records.push(record);catalog.added.push(record);indexRecord(record);reviewData[recordKey(record)]=item.review;importedKeys.push(recordKey(record));if(item.type==='duplicate')duplicated++;else added++;}if(record[4]&&!categories.some(category=>sameCategory(category[0],record[4]))){categories.push([record[4],[]]);catalog.categories.push(record[4]);}}
+ saveLastImport(importedKeys);storeChanges(catalogKey,catalog);storeChanges(storageKey,reviewData);loadCategoryControls();render();byId('csv-review').close();byId('change-notice').textContent='تم الاعتماد: '+numbers.format(added)+' جديد، '+numbers.format(updated)+' تحديث، '+numbers.format(duplicated)+' نسخة مكررة باختيارك.';pendingCsv=[];
+}
 function saveLastImport(keys){
  lastImportKeys=[...keys];
  try{localStorage.setItem(lastImportKey,JSON.stringify(lastImportKeys));}catch{}
@@ -189,6 +191,7 @@ function deletePlace(){
  byId('place-editor').close();byId('change-notice').textContent='تم حذف المكان.';
 }`;
 pages.places=pages.places
+  .replace('</body>',csvImportUi+'</body>')
   .replace('</style>','.danger-action{color:#9f3844;border-color:#d9aeb3}.danger-action:hover{background:#fbeaec;border-color:#c77b84}.subcategory-filter{display:none}.bulk-select{width:18px;height:18px;margin:0 0 0 9px;vertical-align:middle;accent-color:#8b2242}</style>')
   .replace('<label for="state">حالة المراجعة</label>','<label for="state">المراجع</label>')
   .replace('<div class="control mobile-category"><label for="category">','<div class="control"><label for="category">')
@@ -200,7 +203,7 @@ pages.places=pages.places
   .replace("for(const r of records)Object.assign(r,catalog.updates[recordKey(r)]||{});\nrecords.push(...catalog.added);","for(const r of records)Object.assign(r,catalog.updates[recordKey(r)]||{});\nfor(let i=records.length-1;i>=0;i--)if(catalog.removed.includes(recordKey(records[i])))records.splice(i,1);\nrecords.push(...catalog.added);")
   .replace("function init(){",csvImportCode+"\n"+deletePlaceCode+"\nfunction init(){")
   .replace("editing=record;","editing=record;\n byId('delete-place').hidden=!record;")
-  .replace("byId('export').addEventListener('click',exportCsv);","byId('export').addEventListener('click',exportCsv);\n byId('import-csv').addEventListener('click',importCsv);\n byId('import-csv-file').addEventListener('change',readCsv);\n byId('undo-import').addEventListener('click',undoLastImport);\n byId('select-places').addEventListener('click',beginBulkDelete);\n byId('delete-selected').addEventListener('click',deleteSelectedPlaces);\n byId('cancel-selection').addEventListener('click',cancelBulkDelete);\n byId('delete-place').addEventListener('click',deletePlace);")
+  .replace("byId('export').addEventListener('click',exportCsv);","byId('export').addEventListener('click',exportCsv);\n byId('import-csv').addEventListener('click',importCsv);\n byId('import-csv-file').addEventListener('change',readCsv);\n byId('csv-review-close').addEventListener('click',()=>byId('csv-review').close());\n byId('csv-select-new').addEventListener('click',()=>selectCsvItems('new'));\n byId('csv-select-all').addEventListener('click',()=>selectCsvItems('all'));\n byId('csv-clear-all').addEventListener('click',()=>selectCsvItems('none'));\n byId('csv-approve').addEventListener('click',approveCsv);\n byId('undo-import').addEventListener('click',undoLastImport);\n byId('select-places').addEventListener('click',beginBulkDelete);\n byId('delete-selected').addEventListener('click',deleteSelectedPlaces);\n byId('cancel-selection').addEventListener('click',cancelBulkDelete);\n byId('delete-place').addEventListener('click',deletePlace);")
   .replace("const title=node('td');const placeTitle=node('div',undefined,'place-title');","const title=node('td');\n   if(bulkSelecting){\n    const selectBox=node('input',undefined,'bulk-select');selectBox.type='checkbox';selectBox.checked=bulkSelected.has(recordKey(r));\n    selectBox.setAttribute('aria-label','تحديد '+r[0]);selectBox.addEventListener('change',()=>{if(selectBox.checked)bulkSelected.add(recordKey(r));else bulkSelected.delete(recordKey(r));updateBulkDeleteButtons();});title.append(selectBox);\n   }\n   const placeTitle=node('div',undefined,'place-title');")
   .replace("body.replaceChildren(results);","body.replaceChildren(results);\n updateBulkDeleteButtons();")
   .replace("const state=byId('state').value;\n return records.filter", "const reviewer=byId('state').value;\n return records.filter")
